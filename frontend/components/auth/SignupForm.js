@@ -50,7 +50,7 @@ export function SignupForm() {
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className="input-primary w-full pl-10"
+            className="input-primary-with-icon w-full pl-10 pr-4"
             placeholder="Enter your full name"
             required
           />
@@ -68,7 +68,7 @@ export function SignupForm() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="input-primary w-full pl-10"
+            className="input-primary-with-icon w-full pl-10 pr-4"
             placeholder="Enter your email"
             required
           />
@@ -86,7 +86,7 @@ export function SignupForm() {
             type={showPassword ? 'text' : 'password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="input-primary w-full pl-10 pr-10"
+            className="input-primary-with-icon w-full pl-10 pr-10"
             placeholder="Enter your password"
             minLength={6}
             required

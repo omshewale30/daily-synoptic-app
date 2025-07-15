@@ -1,9 +1,9 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect } from 'react'
-import { loginUser, signupUser } from '../lib/api'
+import { createClient } from '../utils/supabase/client';
 
-const AuthContext = createContext()
+const AuthContext = createContext(null)
 
 export function useAuth() {
   const context = useContext(AuthContext)
@@ -15,89 +15,84 @@ export function useAuth() {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [token, setToken] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient()
 
   useEffect(() => {
-    // Check for stored token on initial load
-    const storedToken = localStorage.getItem('daily_synoptic_token')
-    const storedUser = localStorage.getItem('daily_synoptic_user')
-    
-    if (storedToken && storedUser) {
+    const fetchUser = async () => {
       try {
-        setToken(storedToken)
-        setUser(JSON.parse(storedUser))
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user || null);
       } catch (error) {
-        console.error('Error parsing stored user data:', error)
-        localStorage.removeItem('daily_synoptic_token')
-        localStorage.removeItem('daily_synoptic_user')
+        console.error('Error fetching session:', error);
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
+    };
+
+    fetchUser();
+
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user || null);
+        setLoading(false);
+      }
+    );
+
+    // Cleanup the subscription
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const signUp = async (email, password) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+    
+    if (error) {
+      throw error;
     }
     
-    setIsLoading(false)
-  }, [])
+    return data;
+  };
 
-  const login = async (email, password) => {
-    try {
-      const response = await loginUser(email, password)
-      
-      const { access_token, user: userData } = response
-      
-      setToken(access_token)
-      setUser(userData)
-      
-      // Store in localStorage
-      localStorage.setItem('daily_synoptic_token', access_token)
-      localStorage.setItem('daily_synoptic_user', JSON.stringify(userData))
-      
-      return response
-    } catch (error) {
-      throw error
+  // Sign in function
+  const signIn = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    if (error) {
+      throw error;
     }
-  }
+    
+    return data;
+  };
 
-  const signup = async (email, password, fullName) => {
-    try {
-      // First create the user
-      const signupResponse = await signupUser({ email, password, full_name: fullName })
-      
-      // Then log them in
-      const loginResponse = await loginUser(email, password)
-      
-      const { access_token, user: userData } = loginResponse
-      
-      setToken(access_token)
-      setUser(userData)
-      
-      // Store in localStorage
-      localStorage.setItem('daily_synoptic_token', access_token)
-      localStorage.setItem('daily_synoptic_user', JSON.stringify(userData))
-      
-      return loginResponse
-    } catch (error) {
-      throw error
-    }
-  }
-
+  // Logout function
   const logout = async () => {
-    setUser(null)
-    setToken(null)
-    localStorage.removeItem('daily_synoptic_token')
-    localStorage.removeItem('daily_synoptic_user')
-  }
+    const { error } = await supabase.auth.signOut();
+    
+    if (error) {
+      throw error;
+    }
+    
+    setUser(null);
+  };
 
+  // Context value
   const value = {
     user,
-    token,
-    isLoading,
-    login,
-    signup,
-    logout
-  }
+    loading,
+    signUp,
+    signIn,
+    logout,
+  };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
